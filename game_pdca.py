@@ -1,150 +1,192 @@
 import streamlit as st
 import pandas as pd
-import plotly.graph_objects as go
+import plotly.express as px
+import plotly.figure_factory as ff
+from datetime import datetime, timedelta
 
-# --- CẤU HÌNH GIAO DIỆN ---
-st.set_page_config(page_title="KanePackage Adaptive PDCA", layout="wide")
+# --- CẤU HÌNH GIAO DIỆN QUIET LUXURY ---
+st.set_page_config(page_title="KanePackage PDCA Simulation", layout="wide")
+
 st.markdown("""
     <style>
-    .stApp { background-color: #F4F7F6; border-top: 10px solid #001F3F; }
-    .stButton>button { border: 2px solid #C5A021; color: #001F3F; font-weight: bold; }
-    h1, h2, h3 { color: #001F3F; }
+    .main { background-color: #0A192F; color: #E0E0E0; }
+    .stButton>button { background-color: #C5A059; color: #0A192F; border-radius: 5px; font-weight: bold; }
+    .stTextInput>div>div>input { background-color: #112240; color: #C5A059; border: 1px solid #C5A059; }
+    h1, h2, h3 { color: #C5A059; font-family: 'serif'; }
+    .status-box { padding: 20px; border-radius: 10px; border: 1px solid #C5A059; background-color: #112240; }
     </style>
     """, unsafe_allow_html=True)
 
-# --- KHỞI TẠO TRẠNG THÁI ---
+# --- KHỞI TẠO BIẾN TRẠNG THÁI (SESSION STATE) ---
 if 'step' not in st.session_state:
     st.session_state.update({
-        'step': "Input",
+        'step': 'INPUT',
+        'qcd_scores': {'Quality': 70, 'Cost': 70, 'Delivery': 70},
+        'context': {},
+        'plan': {},
         'whys': [],
-        'why_count': 0,
-        'context_keywords': [],
-        'user_responses': {}
+        'current_why': 1
     })
 
-# --- MÀN HÌNH 1: HIỆN TRƯỜNG (GENBA) ---
-if st.session_state.step == "Input":
-    st.title("🛡️ KanePackage: Adaptive PDCA Simulation")
-    st.subheader("I. HOẠCH ĐỊNH: Nắm bắt hiện trạng [cite: 225, 260]")
-    
-    domain = st.selectbox("Khía cạnh trọng yếu (P-Q-C-D-S-M-E-C): [cite: 4, 29]", 
-                          ["Productivity", "Quality", "Cost", "Delivery", "Safety", "Morale", "Environment", "Compliance"])
-    
-    st.write("### Nhập mô tả vấn đề chi tiết (Mục tiêu: Làm rõ 5W1H) [cite: 91, 150]")
-    problem = st.text_area("Học viên hãy mô tả cụ thể sự việc phát sinh tại hiện trường:", 
-                           placeholder="Ví dụ: Công nhân ca chiều thao tác sai máy cắt số 4 gây lỗi mép thùng...")
-    
-    if st.button("PHÂN TÍCH & LẬP KẾ HOẠCH"):
-        if problem:
-            # Logic quét từ khóa để cá nhân hóa
-            keywords = [w for w in problem.split() if len(w) > 3]
-            st.session_state.update({'problem': problem, 'domain': domain, 'context_keywords': keywords, 'step': "Plan"})
-            st.rerun()
+# --- HELPER FUNCTIONS ---
+def update_qcd(q, c, d):
+    st.session_state.qcd_scores['Quality'] += q
+    st.session_state.qcd_scores['Cost'] += c
+    st.session_state.qcd_scores['Delivery'] += d
 
-# --- MÀN HÌNH 2: PLAN (5W1H2C & SMART) ---
-elif st.session_state.step == "Plan":
-    st.title("📝 Stage: PLAN - Hoạch định khả thi [cite: 164, 171]")
-    st.info(f"Vấn đề: {st.session_state.problem}")
+def render_dashboard():
+    df = pd.DataFrame(list(st.session_state.qcd_scores.items()), columns=['Metric', 'Value'])
+    fig = px.line_polar(df, r='Value', theta='Metric', line_close=True, range_r=[0,100],
+                        color_discrete_sequence=['#C5A059'])
+    fig.update_polars(bgcolor="#112240")
+    fig.update_layout(paper_bgcolor="rgba(0,0,0,0)", plot_bgcolor="rgba(0,0,0,0)", font_color="#E0E0E0")
+    st.sidebar.plotly_chart(fig, use_container_width=True)
+    st.sidebar.markdown("### 📊 Chỉ số Quản trị Hiện tại")
+
+# --- MAIN FLOW ---
+st.title("🏛️ KANEPACKAGE GENBA MANAGEMENT SIMULATION")
+st.subheader("Chu trình PDCA: Từ Tư duy đến Thực thi Chiến lược")
+render_dashboard()
+
+# --- STAGE 1: INPUT & 5W1H ---
+if st.session_state.step == 'INPUT':
+    st.header("1. Phân tích Hiện trạng (Genba-Genbutsu-Genzitsu)")
+    aspect = st.selectbox("Chọn khía cạnh quản trị cần cải tiến (P-Q-C-D-S-M-E-C):", 
+                         ["Productivity", "Quality", "Cost", "Delivery", "Safety", "Morale", "Environment", "Compliance"])
     
-    st.write("### 1. Thiết lập mục tiêu SMART [cite: 93, 132]")
-    goal = st.text_input("Mục tiêu cải thiện cụ thể của bạn là gì?")
-    
-    st.write("### 2. Kế hoạch hành động 5W1H2C [cite: 110, 157]")
     col1, col2 = st.columns(2)
     with col1:
-        st.text_input("Who: Ai phụ trách thực hiện? [cite: 152]")
-        st.text_input("How: Phương pháp thực hiện cụ thể? [cite: 153]")
+        who = st.text_input("Who: Ai là đối tượng liên quan trực tiếp?")
+        where = st.text_input("Where: Vấn đề xảy ra tại công đoạn/vị trí nào?")
+        when = st.text_input("When: Tần suất hoặc thời điểm phát sinh?")
     with col2:
-        st.text_input("Control: Phương pháp kiểm soát là gì? [cite: 154]")
-        st.text_input("Check: Chỉ số KPI đo lường? [cite: 155, 237]")
+        what = st.text_area("What: Mô tả cụ thể hiện tượng (Hiện vật)?")
+        why_init = st.text_input("Why: Tại sao đây lại là vấn đề cấp bách?")
+        how = st.text_input("How: Hiện trạng đang được xử lý như thế nào?")
 
-    if st.button("XÁC NHẬN KẾ HOẠCH & TRIỂN KHAI (DO)"):
-        st.session_state.goal = goal
-        st.session_state.step = "Do"
-        st.rerun()
-
-# --- MÀN HÌNH 3: DO (ĐIỀU HÀNH THỰC TẾ) ---
-elif st.session_state.step == "Do":
-    st.title("🛠️ Stage: DO - Thực hiện & Đào tạo [cite: 174, 180]")
-    st.write(f"Đang triển khai kế hoạch cho vấn đề: **{st.session_state.problem}**")
-    
-    st.error("🚨 BIẾN CỐ: Trong quá trình làm, phát sinh vấn đề ngoài dự kiến liên quan đến nhân sự!")
-    
-    # Phương án dựa trên "Những lưu ý trong giai đoạn DO" [cite: 202-210]
-    choice = st.radio("Lựa chọn đối ứng của người quản lý:", [
-        "A. Tạm dừng để trực tiếp hướng dẫn và ủy quyền đào tạo (Tư duy: Đào tạo cấp dưới là đường ngắn nhất) [cite: 207, 208]",
-        "B. Ra lệnh yêu cầu làm đúng theo SOP, không cần bàn bạc thêm (Bẫy: Tâm lý 'Bị bắt phải làm') [cite: 160, 206]",
-        "C. Tự mình xử lý ngay để kịp tiến độ giao hàng (Bẫy: Người quản lý không đi tiên phong dẫn dắt) [cite: 203]",
-        "D. Bỏ qua biến cố nhỏ, tập trung vào KPI cuối ngày (Bẫy: Không tuân thủ 3G tại hiện trường) [cite: 188, 245]"
-    ])
-    
-    if st.button("XÁC NHẬN"):
-        st.session_state.do_feedback = choice
-        st.session_state.step = "Check"
-        st.rerun()
-
-# --- MÀN HÌNH 4: CHECK (5 WHYS ĐỘNG) ---
-elif st.session_state.step == "Check":
-    st.title("📊 Stage: CHECK - Phân tích tại hiện trường [cite: 238, 241]")
-    
-    # Hiển thị khoảng cách Gap Analysis [cite: 147, 300]
-    st.write(f"Mục tiêu: {st.session_state.goal}")
-    st.warning("Thực tế: Kết quả chỉ đạt 70% mục tiêu do phát sinh lỗi hệ thống.")
-
-    # Logic 5 Whys bám sát dữ liệu [cite: 103, 233, 248]
-    if st.session_state.why_count < 5:
-        # Câu hỏi Why đầu tiên bám vào vấn đề ban đầu
-        if st.session_state.why_count == 0:
-            current_q = f"Tại sao vấn đề '{st.session_state.problem}' vẫn xảy ra dù đã có kế hoạch?"
-        else:
-            # Lấy câu trả lời trước đó để hỏi Why tiếp theo
-            prev_ans = st.session_state.whys[-1]
-            current_q = f"Tại sao bạn cho rằng '{prev_ans}' là nguyên nhân trực tiếp?"
-
-        st.subheader(f"Câu hỏi Why thứ {st.session_state.why_count + 1}:")
-        st.info(current_q)
-        ans = st.text_input("Nhập phân tích của bạn:", key=f"ans_{st.session_state.why_count}")
-        
-        if st.button("GỬI PHÂN TÍCH"):
-            if ans:
-                st.session_state.whys.append(ans)
-                st.session_state.why_count += 1
-                st.rerun()
-    else:
-        st.success("Bạn đã hoàn thành 5 tầng Why để tìm nguyên nhân gốc rễ! ")
-        if st.button("TIẾN TỚI HÀNH ĐỘNG CẢI TIẾN"):
-            st.session_state.step = "Action"
+    if st.button("Xác nhận bối cảnh 5W1H"):
+        if all([who, where, when, what, why_init, how]):
+            st.session_state.context = {"aspect": aspect, "what": what, "keywords": what.lower()}
+            st.session_state.step = 'PLAN'
             st.rerun()
-
-# --- MÀN HÌNH 5: ACTION (TIÊU CHUẨN HÓA) ---
-elif st.session_state.step == "Action":
-    st.title("🚀 Stage: ACTION - Tiêu chuẩn hóa & Cải tiến liên tục [cite: 264, 314]")
-    
-    st.write("### Các bước cần làm để đóng lại chu trình PDCA: [cite: 78, 265, 273]")
-    st.write(f"Nguyên nhân gốc rễ bạn tìm được: **{st.session_state.whys[-1]}**")
-    
-    st.markdown("""
-    1. **Tiêu chuẩn hóa (Standardize):** Cập nhật SOP, đào tạo lại dựa trên nguyên nhân gốc rễ[cite: 78, 312].
-    2. **Yokoten:** Chia sẻ bài học thành công/thất bại cho các bộ phận khác[cite: 183, 274].
-    3. **Nâng cao tiêu chuẩn:** Đặt mục tiêu cao hơn cho vòng lặp tiếp theo[cite: 313].
-    """)
-    
-    new_standard = st.text_area("Học viên hãy soạn thảo 1 quy định mới để ngăn chặn lỗi này vĩnh viễn:")
-    
-    if st.button("HOÀN TẤT & ĐÁNH GIÁ"):
-        st.balloons()
-        st.header("🏆 ĐÁNH GIÁ NĂNG LỰC QUẢN TRỊ")
-        # Logic đánh giá bám sát tư duy đào tạo
-        if "triệt để" in st.session_state.do_feedback:
-            st.success("Bạn có tư duy đào tạo cấp dưới rất tốt! [cite: 207]")
         else:
-            st.warning("Bạn cần chú ý tránh bẫy 'tự làm thay' nhân viên. [cite: 203]")
-            
-        st.write("---")
-        st.write("### Chuỗi tư duy 5 Whys của bạn:")
-        for i, w in enumerate(st.session_state.whys):
-            st.write(f"Bậc {i+1}: {w}")
+            st.error("Vui lòng đảm bảo MECE - Cung cấp đầy đủ thông tin để nắm bắt toàn diện vấn đề.")
+
+# --- STAGE 2: PLAN (SMART & 5W1H2C) ---
+elif st.session_state.step == 'PLAN':
+    st.header("2. Hoạch định (PLAN)")
+    
+    st.markdown("### Thiết lập mục tiêu SMART")
+    target = st.text_input("Nhập mục tiêu của bạn (Ví dụ: Giảm tỷ lệ lỗi xuống 1% trong 3 tháng):")
+    
+    if target:
+        # Logic đánh giá SMART đơn giản
+        checks = {
+            "Specific": any(word in target.lower() for word in ["giảm", "tăng", "đạt"]),
+            "Measurable": any(char.isdigit() for char in target),
+            "Time-bound": any(word in target.lower() for word in ["tháng", "tuần", "ngày", "năm"])
+        }
         
-        if st.button("Bắt đầu chu trình PDCA mới"):
+        for k, v in checks.items():
+            if v: st.success(f"✅ {k}")
+            else: st.error(f"❌ {k}: Cần bổ sung dữ liệu cụ thể.")
+        
+        if all(checks.values()):
+            st.markdown("---")
+            st.markdown("### Lập kế hoạch 5W1H2C & 5M")
+            col1, col2 = st.columns(2)
+            with col1:
+                method = st.text_input("Method: Phương pháp thực hiện mới là gì?")
+                man = st.number_input("Man: Số lượng nhân sự cần thiết?", min_value=1)
+                control = st.text_area("Control: Bạn kiểm soát quá trình này như thế nào để đảm bảo đạt mục tiêu?")
+            with col2:
+                check_kpi = st.text_input("Check (KPI): Bạn nhìn vào chỉ số nào để biết mình thành công?")
+                timeline = st.date_input("Thời hạn hoàn thành:", [datetime.now(), datetime.now() + timedelta(days=30)])
+
+            if st.button("Phê duyệt Kế hoạch"):
+                st.session_state.plan = {"kpi": check_kpi, "control": control}
+                st.session_state.step = 'DO'
+                st.rerun()
+
+# --- STAGE 3: DO (BIẾN CỐ & BẪY TƯ DUY) ---
+elif st.session_state.step == 'DO':
+    st.header("3. Thực hiện & Điều hành (DO)")
+    
+    # Logic động dựa trên keyword
+    event_msg = "Máy móc gặp sự cố bất ngờ!" if "máy" in st.session_state.context['keywords'] else "Nhân sự chủ chốt xin nghỉ đột xuất!"
+    
+    st.warning(f"⚠️ BIẾN CỐ: {event_msg}")
+    st.info(f"Mục tiêu của bạn là: {st.session_state.plan['kpi']}. Bạn sẽ hành động thế nào?")
+    
+    choice = st.radio("Chọn phương án xử lý:", [
+        "Trực tiếp vào làm thay để kịp tiến độ (Firefighting)",
+        "Giao cho tổ trưởng tự giải quyết, mình đợi báo cáo (Ủy quyền phó mặc)",
+        "Yêu cầu tăng ca bù đắp sản lượng, đào tạo tính sau (Tập trung năng suất)",
+        "Dừng lại hiện trường, hướng dẫn Genba và thiết lập Horenso (Manager as Coach)"
+    ])
+
+    if st.button("Thực thi quyết định"):
+        if "Manager as Coach" in choice:
+            st.success("Tuyệt vời! Bạn đã chọn tư duy TPS: Dừng lại để cải tiến.")
+            update_qcd(10, -5, 5) # Chất lượng tăng, chi phí tăng nhẹ do dừng máy
+        else:
+            st.error("Bẫy tư duy! Quyết định này sẽ gây hệ lụy dài hạn cho hệ thống.")
+            update_qcd(-10, 10, -5)
+        
+        st.session_state.step = 'CHECK'
+        st.rerun()
+
+# --- STAGE 4: CHECK (5-WHYS) ---
+elif st.session_state.step == 'CHECK':
+    st.header("4. Kiểm tra & Phân tích Gốc rễ (5-Whys)")
+    
+    whys_labels = [
+        "Hiện tượng: Tại sao sự cố vẫn xảy ra dù có kế hoạch?",
+        "Tiêu chuẩn: Tại sao tiêu chuẩn hiện tại không ngăn chặn được?",
+        "Ý thức/Kỹ năng: Tại sao nhân viên chưa thực hiện đúng tiêu chuẩn?",
+        "Quản lý: Tại sao hệ thống đào tạo/giám sát chưa phát hiện ra lỗ hổng?",
+        "Lỗi hệ thống: Gốc rễ nằm ở cơ chế quản trị nào?"
+    ]
+    
+    curr_idx = st.session_state.current_why - 1
+    st.markdown(f"**Lớp cắt thứ {st.session_state.current_why}:**")
+    ans = st.text_input(whys_labels[curr_idx])
+    
+    if st.button("Tiếp tục truy vấn"):
+        if len(ans) < 10:
+            st.warning("Câu trả lời quá hời hợt! Hãy nhìn vào 'Hiện thực' (Genzitsu).")
+        else:
+            st.session_state.whys.append(ans)
+            if st.session_state.current_why < 5:
+                st.session_state.current_why += 1
+                st.rerun()
+            else:
+                st.session_state.step = 'ACTION'
+                st.rerun()
+
+# --- STAGE 5: ACTION (STANDARDIZATION) ---
+elif st.session_state.step == 'ACTION':
+    st.header("5. Tiêu chuẩn hóa & Cải tiến (ACTION)")
+    st.markdown("### Thiết lập SOP & Yokoten")
+    
+    sop = st.text_area("Cập nhật SOP: Bạn sẽ thay đổi quy trình làm việc như thế nào để lỗi không lặp lại?")
+    yokoten = st.text_area("Lan tỏa (Yokoten): Những bộ phận nào khác tại KanePackage có thể học hỏi từ bài học này?")
+    
+    if st.button("Hoàn thành chu trình PDCA"):
+        st.balloons()
+        st.header("📋 BẢN KẾ HOẠCH HÀNH ĐỘNG THỰC CHIẾN")
+        
+        res_col1, res_col2 = st.columns(2)
+        with res_col1:
+            st.subheader("Phân tích Gốc rễ (5-Whys)")
+            for i, w in enumerate(st.session_state.whys):
+                st.write(f"Why {i+1}: {w}")
+        with res_col2:
+            st.subheader("Hành động Tiêu chuẩn")
+            st.write(f"**SOP mới:** {sop}")
+            st.write(f"**Kế hoạch lan tỏa:** {yokoten}")
+        
+        st.info("Bản kế hoạch này đã sẵn sàng để trình bày tại Genba của KanePackage!")
+        if st.button("Chơi lại từ đầu"):
             st.session_state.clear()
             st.rerun()
