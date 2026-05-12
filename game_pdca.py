@@ -180,14 +180,29 @@ def ai(system_prompt: str, user_prompt: str, tokens: int = 800) -> str:
         return f"[AI Error: {e}]"
 
 def parse_json(text: str, fallback=None):
+    if not text or text.startswith("[AI Error"):
+        return fallback if fallback is not None else {}
+    # Remove markdown fences
+    clean = re.sub(r"```json|```", "", text).strip()
+    # Try direct parse
     try:
-        return json.loads(re.sub(r"```json|```","",text).strip())
+        return json.loads(clean)
     except Exception:
-        try:
-            m = re.search(r"\{.*\}", text, re.DOTALL)
-            if m: return json.loads(m.group())
-        except Exception:
-            pass
+        pass
+    # Try extracting JSON object
+    try:
+        m = re.search(r"\{[\s\S]*\}", clean)
+        if m:
+            return json.loads(m.group())
+    except Exception:
+        pass
+    # Try fixing common issues: single quotes, trailing commas
+    try:
+        fixed = re.sub(r",\s*([}\]])", r"", clean)
+        fixed = fixed.replace("'", '"')
+        return json.loads(fixed)
+    except Exception:
+        pass
     return fallback if fallback is not None else {}
 
 # ─────────────────────────────────────────────
@@ -338,11 +353,31 @@ def stage_5w1h():
 # ─────────────────────────────────────────────────────
 def eval_smart(goal: str) -> dict:
     ctx = "; ".join([f"{QUESTIONS_5W1H[ss.aspect][int(k.replace('q',''))][0]}: {v}" for k, v in ss.ctx_answers.items()])
-    raw = ai(
-        'Chuyên gia đào tạo quản lý. Đánh giá mục tiêu SMART. Trả về JSON duy nhất: {"S":{"pass":true/false,"comment":"1 câu"},"M":{"pass":true/false,"comment":"..."},"A":{"pass":true/false,"comment":"..."},"R":{"pass":true/false,"comment":"..."},"T":{"pass":true/false,"comment":"..."},"overall":true/false,"tip":"lời khuyên nếu chưa đạt"}. S=Specific M=Measurable A=Achievable R=Relevant T=Time-bound.',
-        f"Vấn đề: {ctx}\nMục tiêu: {goal}"
-    )
-    return parse_json(raw, fallback={"S":{"pass":False,"comment":"Cần cụ thể hơn"},"M":{"pass":False,"comment":"Cần có số đo"},"A":{"pass":False,"comment":"Cần xem tính khả thi"},"R":{"pass":False,"comment":"Cần liên hệ vấn đề"},"T":{"pass":False,"comment":"Cần có deadline"},"overall":False,"tip":"Thêm con số cụ thể và thời hạn rõ ràng."})
+    system = """Bạn là chuyên gia đánh giá mục tiêu SMART cho quản lý sản xuất.
+NHIỆM VỤ: Đánh giá mục tiêu theo 5 tiêu chí SMART và trả về JSON.
+QUY TẮC QUAN TRỌNG:
+- Chỉ trả về JSON thuần túy, không có text nào khác, không có markdown
+- Nếu mục tiêu có con số cụ thể (%), có thời hạn rõ ràng → pass=true cho M và T
+- Đánh giá thực tế, không quá khắt khe
+JSON FORMAT (bắt buộc đúng cấu trúc này):
+{"S":{"pass":true,"comment":"nhận xét ngắn"},"M":{"pass":true,"comment":"nhận xét ngắn"},"A":{"pass":true,"comment":"nhận xét ngắn"},"R":{"pass":true,"comment":"nhận xét ngắn"},"T":{"pass":true,"comment":"nhận xét ngắn"},"overall":true,"tip":""}"""
+    raw = ai(system, f"Bối cảnh vấn đề: {ctx[:300]}\nMục tiêu cần đánh giá: {goal}", tokens=600)
+    result = parse_json(raw, fallback=None)
+    # If parse failed, do manual evaluation
+    if not result or "S" not in result:
+        has_number = bool(re.search(r"\d+[%\s]", goal))
+        has_time   = bool(re.search(r"tháng|tuần|ngày|quý|năm|/20\d\d", goal, re.IGNORECASE))
+        has_action = len(goal) > 20
+        result = {
+            "S": {"pass": has_action, "comment": "Mục tiêu có mô tả hành động cụ thể" if has_action else "Cần mô tả cụ thể hơn"},
+            "M": {"pass": has_number, "comment": "Có chỉ số đo lường rõ ràng" if has_number else "Cần thêm con số cụ thể (%, số lượng)"},
+            "A": {"pass": has_action, "comment": "Mục tiêu có vẻ khả thi" if has_action else "Cần xem xét tính khả thi"},
+            "R": {"pass": has_action, "comment": "Liên quan đến vấn đề đã nêu" if has_action else "Cần liên hệ rõ với vấn đề"},
+            "T": {"pass": has_time,   "comment": "Có thời hạn rõ ràng" if has_time else "Cần thêm deadline cụ thể (tháng/năm)"},
+            "overall": has_number and has_time,
+            "tip": "" if (has_number and has_time) else "Thêm con số % và thời hạn cụ thể (VD: từ tháng 6/2026)"
+        }
+    return result
 
 def stage_smart():
     st.markdown('<div class="stage-header">③ Thiết lập Mục Tiêu SMART</div>', unsafe_allow_html=True)
