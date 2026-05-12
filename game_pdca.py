@@ -18,7 +18,7 @@ from datetime import datetime, timedelta
 # Lấy MIỄN PHÍ tại: aistudio.google.com → Sign in → Get API Key
 # ─────────────────────────────────────────────
 GEMINI_API_KEY = "AIzaSyA7jcZmNqxedTvVWN9ExbFJnxgoWoMG8zU"
-GEMINI_MODEL   = "gemini-1.5-flash"
+GEMINI_MODEL   = "gemini-2.0-flash"
 
 genai.configure(api_key=GEMINI_API_KEY)
 
