@@ -88,6 +88,29 @@ ASPECTS = {
     "CM":("Compliance","Tuân thủ"),
 }
 ASPECT_ICONS = ["📊","🎯","💰","🚚","🦺","🧑‍🤝‍🧑","🌿","📋"]
+# ─────────────────────────────────────────────
+# FALLBACK CONTENT (dùng khi API quota hết)
+# ─────────────────────────────────────────────
+FALLBACK_INCIDENTS = {
+    "P": "Tổ trưởng ca 2 báo khẩn: 'Anh/Chị ơi, máy đóng gói chuyền B vừa bị kẹt băng tải, 3 công nhân đang đứng chờ. Nếu không xử lý trong 30 phút là trễ kế hoạch sản lượng buổi chiều rồi. Em chưa biết xử lý thế nào!'",
+    "Q": "QC trưởng báo cáo khẩn: 'Anh/Chị ơi, lô hàng 500 hộp vừa hoàn thành bị phát hiện lỗi in nhãn sai thông tin. Khách hàng đang chờ giao hàng chiều nay. Mình có nên xuất hàng trước rồi đổi nhãn sau không?'",
+    "C": "Kế toán gửi tin nhắn: 'Anh/Chị ơi, chi phí vật tư tháng này đã vượt 23% so với ngân sách rồi. Giám đốc đang hỏi báo cáo giải trình. Đội sản xuất nói do máy hỏng phải dùng nguyên liệu thay thế đắt hơn.'",
+    "D": "Nhân viên kho báo: 'Anh/Chị ơi, xe tải đến lấy hàng lúc 3h chiều nhưng đơn hàng 200 thùng chưa đóng gói xong. Chuyền đang chạy chậm hơn kế hoạch 40%. Khách hàng sẽ bị phạt hợp đồng nếu trễ!'",
+    "S": "Tổ trưởng báo cáo: 'Anh/Chị ơi, anh Nam vừa bị trượt ngã tại khu vực máy cán do sàn ướt. Anh ấy đau chân nhưng vẫn muốn tiếp tục làm vì sợ ảnh hưởng tiến độ. An toàn hay tiến độ bây giờ?'",
+    "M": "HR báo: 'Anh/Chị ơi, 2 công nhân lành nghề nhất tổ B vừa nộp đơn nghỉ việc cùng lúc. Họ nói áp lực quá, không được ghi nhận. Cả tổ đang xì xầm và năng suất hôm nay giảm rõ rệt.'",
+    "E": "Bảo vệ báo khẩn: 'Anh/Chị ơi, nước thải từ khu xử lý đang chảy ra rãnh ngoài hàng rào. Có người dân đang quay phim. Hệ thống bơm bị hỏng từ tối qua nhưng không ai báo cáo!'",
+    "CM": "Trưởng phòng báo: 'Anh/Chị ơi, đoàn kiểm tra lao động sẽ đến bất ngờ chiều nay. Hồ sơ huấn luyện an toàn của 5 công nhân mới chưa hoàn thiện. Có nên điền lùi ngày không?'",
+}
+
+FALLBACK_WHY_Q = {
+    1: "Bạn quan sát thấy hiện tượng gì xảy ra trực tiếp tại hiện trường? Mô tả cụ thể những gì nhìn thấy, nghe thấy.",
+    2: "Tiêu chuẩn hoặc quy trình SOP nào đáng lẽ phải được tuân thủ để ngăn chặn hiện tượng này xảy ra?",
+    3: "Người thực hiện có đủ kỹ năng và ý thức để tuân thủ tiêu chuẩn đó không? Điều gì cho thấy có hoặc không?",
+    4: "Hệ thống giám sát và kiểm soát của quản lý đã bỏ sót điều gì khiến vấn đề kéo dài mà không được phát hiện?",
+    5: "Ở cấp độ văn hóa và tư duy tổ chức, điều gì đã tạo ra môi trường để vấn đề này tồn tại lâu dài như vậy?",
+}
+
+
 
 QUESTIONS_5W1H = {
     "P":[("What","Vấn đề năng suất cụ thể là gì? (VD: sản lượng thấp, cycle time dài…)"),("Why","Tại sao đây là vấn đề ưu tiên cần giải quyết ngay?"),("Where","Vấn đề xảy ra ở công đoạn / dây chuyền / bộ phận nào?"),("Who","Những ai liên quan? Ai chịu trách nhiệm chính?"),("When","Vấn đề bắt đầu từ khi nào? Có xảy ra theo chu kỳ không?"),("How","Quy trình hiện tại đang được thực hiện như thế nào? Có SOP không?"),("How much","Tình trạng hiện tại đang ở mức nào? (số liệu cụ thể: %, UPH…)")],
@@ -168,7 +191,7 @@ ss = st.session_state
 # ─────────────────────────────────────────────
 # AI HELPER — Gemini
 # ─────────────────────────────────────────────
-def ai(system_prompt: str, user_prompt: str, tokens: int = 800) -> str:
+def ai(system_prompt: str, user_prompt: str, tokens: int = 800, _fallback: str = "") -> str:
     try:
         model = genai.GenerativeModel(GEMINI_MODEL, system_instruction=system_prompt)
         resp  = model.generate_content(
@@ -177,6 +200,9 @@ def ai(system_prompt: str, user_prompt: str, tokens: int = 800) -> str:
         )
         return resp.text
     except Exception as e:
+        err = str(e)
+        if "429" in err or "quota" in err.lower():
+            return _fallback if _fallback else "__QUOTA__"
         return f"[AI Error: {e}]"
 
 def parse_json(text: str, fallback=None):
@@ -208,7 +234,7 @@ def parse_json(text: str, fallback=None):
 # ─────────────────────────────────────────────
 # QCD DASHBOARD
 # ─────────────────────────────────────────────
-def render_qcd():
+def render_qcd(prefix="main"):
     q = ss.qcd
     labels = ["Quality","Cost","Delivery"]
     vals   = [q["quality"],q["cost"],q["delivery"]]
@@ -229,7 +255,7 @@ def render_qcd():
                 },
             ))
             fig.update_layout(height=175,margin=dict(l=10,r=10,t=40,b=5),paper_bgcolor="#112240",font_color="#F5F0E8")
-            st.plotly_chart(fig, use_container_width=True, key=f"qcd_{i}_{vals[i]}")
+            st.plotly_chart(fig, use_container_width=True, key=f"qcd_{prefix}_{i}_{vals[i]}")
 
 # ─────────────────────────────────────────────
 # PROGRESS BAR
@@ -548,10 +574,13 @@ def stage_check():
             with st.spinner(f"Đang phân tích Why {level}…"):
                 prev = f"Biến cố: {ss.incident}" if level==1 else ss.why_answers.get(level-1,"")
                 prev_text = "".join([f"Why {l}: {ss.why_questions.get(l,'')}\nTrả lời: {ss.why_answers.get(l,'')}\n" for l in range(1,level)])
-                ss.why_questions[level] = ai(
+                fallback_q = FALLBACK_WHY_Q.get(level, f"Tại sao điều đó lại xảy ra? Hãy đào sâu hơn một tầng nữa.")
+                result = ai(
                     f"Chuyên gia 5 Whys Toyota. Đặt câu hỏi Why thứ {level}. Mục tiêu tầng {level}: {WHY_GUIDANCE.get(level,'')}. Đi sâu hơn câu trả lời trước, tối đa 1-2 câu. Chỉ trả về câu hỏi.",
-                    f"Vấn đề: {ss.incident}\nTừ khóa: {', '.join(ss.keywords)}\n{prev_text}Câu trả lời Why {level-1}: {prev}"
+                    f"Vấn đề: {ss.incident}\nTừ khóa: {', '.join(ss.keywords)}\n{prev_text}Câu trả lời Why {level-1}: {prev}",
+                    _fallback=fallback_q
                 ).strip()
+                ss.why_questions[level] = fallback_q if result == "__QUOTA__" else result
 
         q = ss.why_questions[level]
         st.markdown(f'<div class="card-gold"><span class="badge">Why {level}/{MAX}</span> <span style="color:#8896a8;font-size:0.82rem;">— {WHY_GUIDANCE.get(level,"")}</span><br><strong style="font-size:1.05rem;color:#F5F0E8;">{q}</strong></div>', unsafe_allow_html=True)
@@ -560,9 +589,12 @@ def stage_check():
         label = f"→ Why {level+1}" if level < MAX else "→ Kết luận"
         if st.button(label, key=f"why_next_{level}"):
             if ans.strip():
-                ss.why_answers[level] = ans.strip(); ss.why_level = level+1
-                if not ss.check_score_applied: ss.score += 8
-                st.rerun()
+                if len(ans.strip()) < 15:
+                    st.warning("⚠️ Câu trả lời quá ngắn. Hãy phân tích cụ thể hơn để nhận điểm (tối thiểu 15 ký tự).")
+                else:
+                    ss.why_answers[level] = ans.strip(); ss.why_level = level+1
+                    if not ss.check_score_applied: ss.score += 8
+                    st.rerun()
             else:
                 st.warning("Hãy phân tích kỹ trước khi tiếp tục.")
     else:
@@ -573,10 +605,13 @@ def stage_check():
         if not ss.root_cause_summary:
             with st.spinner("Đang tổng hợp nguyên nhân gốc rễ…"):
                 why_text = "\n".join([f"Why {l}: Q:{ss.why_questions.get(l,'')} | A:{ss.why_answers.get(l,'')}" for l in range(1,6)])
-                ss.root_cause_summary = ai(
+                all_answers = " ".join([ss.why_answers.get(l,"") for l in range(1,6)])
+                fallback_rc = f"Nguyên nhân gốc rễ dựa trên phân tích 5 Whys: {all_answers[:200]}... Cấp độ thất bại: Cần xem xét lại hệ thống quản lý và tiêu chuẩn vận hành hiện tại."
+                result = ai(
                     "Tóm tắt nguyên nhân gốc rễ từ 5 Whys thành 2-3 câu. Xác định: (1) Nguyên nhân gốc rễ chính, (2) Cấp độ thất bại (vận hành/quy trình/hệ thống). Trả lời tiếng Việt.",
-                    why_text
+                    why_text, _fallback=fallback_rc
                 ).strip()
+                ss.root_cause_summary = fallback_rc if result == "__QUOTA__" else result
         st.markdown(f'<div class="card-gold"><div class="badge">🎯 Nguyên nhân gốc rễ</div><p style="color:#F5F0E8;line-height:1.8;">{ss.root_cause_summary}</p></div>', unsafe_allow_html=True)
         st.markdown('<div class="insight">✅ Nguyên nhân gốc rễ là nền tảng để xây dựng ACTION bền vững — không phải "vá víu" mà là thay đổi hệ thống.</div>', unsafe_allow_html=True)
         if st.button("Tiếp theo →  Giai đoạn ACTION"):
@@ -610,7 +645,11 @@ def stage_action():
             st.markdown(f'<p style="margin:0.5rem 0;"><span class="badge">{label}</span><br><span style="color:#F5F0E8;font-size:0.88rem;">{ss.std_answers.get(key_n,"—")}</span></p>', unsafe_allow_html=True)
         if not ss.qcd_action_applied:
             ss.qcd["quality"] = min(100,ss.qcd["quality"]+6); ss.qcd["cost"] = min(100,ss.qcd["cost"]+5)
-            ss.qcd["delivery"] = min(100,ss.qcd["delivery"]+7); ss.qcd_action_applied = True; ss.score += 40
+            ss.qcd["delivery"] = min(100,ss.qcd["delivery"]+7); ss.qcd_action_applied = True
+            # Tính điểm dựa trên chất lượng câu trả lời
+            quality_answers = sum(1 for k in ["sop_update","ojt_plan","yokoten","next_pdca","commitment"]
+                                  if len(ss.std_answers.get(k,"")) >= 20)
+            ss.score += quality_answers * 8  # tối đa 40 điểm nếu 5/5 câu đủ chất lượng
         st.markdown('<div class="insight">🔄 PDCA không kết thúc — nó xoay. Bản Standardization này là nền tảng cho chu trình tiếp theo ở mức độ trưởng thành cao hơn.</div>', unsafe_allow_html=True)
         if st.button("Xem Kết Quả & Tải Action Plan →"):
             ss.stage = 8; st.rerun()
@@ -696,7 +735,7 @@ def stage_results():
 
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
     st.markdown("### 📊 Dashboard QCD Cuối Game")
-    render_qcd()
+    render_qcd("results")
     st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
     if not ss.report_md:
@@ -728,7 +767,7 @@ def main():
         if ss.stage >= 4:
             with st.sidebar:
                 st.markdown('<div style="color:#C9A84C;font-weight:700;margin-bottom:0.5rem;font-size:0.9rem;">📊 QCD Dashboard</div>', unsafe_allow_html=True)
-                render_qcd()
+                render_qcd("sidebar")
                 st.markdown(f'<div class="score-box" style="margin-top:0.5rem;"><div class="score-num">{ss.score}</div><div class="muted">điểm</div></div>', unsafe_allow_html=True)
         st.markdown('<hr class="divider">', unsafe_allow_html=True)
 
