@@ -17,7 +17,7 @@ from datetime import datetime, timedelta
 # 🔑 GEMINI API KEY — Điền key của Forval vào đây
 # Lấy MIỄN PHÍ tại: aistudio.google.com → Sign in → Get API Key
 # ─────────────────────────────────────────────
-GEMINI_API_KEY = "AIzaSyA7jcZmNqxedTvVWN9ExbFJnxgoWoMG8zU"
+GEMINI_API_KEY = "AIzaSyDtxWEeBoTeRNVL1_NIeH2E0ZTIXL4IzsI"
 GEMINI_MODEL   = "gemini-2.0-flash"
 
 genai.configure(api_key=GEMINI_API_KEY)
