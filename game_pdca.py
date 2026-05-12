@@ -64,6 +64,9 @@ hr.divider{border:none;border-top:1px solid var(--navy3);margin:1.5rem 0;}
 .stTextInput>div>div>input:focus,.stTextArea>div>div>textarea:focus{border-color:var(--gold) !important;box-shadow:0 0 0 2px rgba(201,168,76,0.15) !important;}
 .stButton>button{background:var(--gold) !important;color:var(--navy) !important;font-weight:700 !important;border:none !important;border-radius:8px !important;padding:0.5rem 1.6rem !important;font-family:'Inter',sans-serif !important;letter-spacing:0.04em !important;}
 .stButton>button:hover{background:var(--gold2) !important;transform:translateY(-1px);box-shadow:0 4px 12px rgba(201,168,76,0.25) !important;}
+.stTextInput>div>div>input::placeholder,.stTextArea>div>div>textarea::placeholder{color:#8896a8 !important;opacity:1 !important;}
+.stTextInput>div>div>input::-webkit-input-placeholder,.stTextArea>div>div>textarea::-webkit-input-placeholder{color:#8896a8 !important;opacity:1 !important;}
+label[data-testid="stWidgetLabel"] p, .stTextArea label, .stTextInput label{color:#C9A84C !important;font-weight:600 !important;}
 .stRadio>div{background:transparent !important;}
 .stRadio label{color:var(--cream) !important;font-size:0.92rem !important;}
 [data-testid="stSidebar"]{background:var(--navy2) !important;}
@@ -334,7 +337,7 @@ def stage_5w1h():
 # STAGE 3 — SMART GOAL
 # ─────────────────────────────────────────────────────
 def eval_smart(goal: str) -> dict:
-    ctx = "; ".join([f"{QUESTIONS_5W1H[ss.aspect][i][0]}: {v}" for i, v in ss.ctx_answers.items()])
+    ctx = "; ".join([f"{QUESTIONS_5W1H[ss.aspect][int(k.replace('q',''))][0]}: {v}" for k, v in ss.ctx_answers.items()])
     raw = ai(
         'Chuyên gia đào tạo quản lý. Đánh giá mục tiêu SMART. Trả về JSON duy nhất: {"S":{"pass":true/false,"comment":"1 câu"},"M":{"pass":true/false,"comment":"..."},"A":{"pass":true/false,"comment":"..."},"R":{"pass":true/false,"comment":"..."},"T":{"pass":true/false,"comment":"..."},"overall":true/false,"tip":"lời khuyên nếu chưa đạt"}. S=Specific M=Measurable A=Achievable R=Relevant T=Time-bound.',
         f"Vấn đề: {ctx}\nMục tiêu: {goal}"
@@ -457,7 +460,7 @@ def stage_do():
     st.markdown('<div class="stage-header">⑤ Giai Đoạn DO — Thực Hiện & Điều Hành</div>', unsafe_allow_html=True)
     if not ss.incident_generated:
         with st.spinner("Đang tạo tình huống thực chiến…"):
-            ctx = "\n".join([f"{QUESTIONS_5W1H[ss.aspect][i][0]}: {v}" for i,v in ss.ctx_answers.items()])
+            ctx = "\n".join([f"{QUESTIONS_5W1H[ss.aspect][int(k.replace('q',''))][0]}: {v}" for k,v in ss.ctx_answers.items()])
             ss.incident = ai(
                 "Bạn là chuyên gia mô phỏng quản trị sản xuất. Tạo BIẾN CỐ bất ngờ (50-80 từ tiếng Việt) xảy ra trong khi thực hiện kế hoạch. Phải: liên quan từ khóa/vấn đề, tạo áp lực thực sự, viết dạng thông báo khẩn từ tổ trưởng. Chỉ trả về đoạn văn mô tả, không tiêu đề.",
                 f"Khía cạnh: {ASPECTS[ss.aspect][1]}\nTừ khóa: {', '.join(ss.keywords)}\nBối cảnh: {ctx}\nMục tiêu: {ss.smart_goal}"
@@ -582,7 +585,7 @@ def stage_action():
 # ─────────────────────────────────────────────────────
 def make_report() -> str:
     asp  = ss.aspect; qs = QUESTIONS_5W1H[asp]
-    ctx  = "\n".join([f"  - {qs[i][0]}: {v}" for i,v in ss.ctx_answers.items()])
+    ctx  = "\n".join([f"  - {qs[int(k.replace("q",""))][0]}: {v}" for k,v in ss.ctx_answers.items()])
     plan = "\n".join([f"  - {PLAN_QUESTIONS[j][1]}: {ss.plan_answers.get(PLAN_QUESTIONS[j][0],'')}" for j in range(len(PLAN_QUESTIONS))])
     whys = "\n".join([f"  Why {l}:\n    Q: {ss.why_questions.get(l,'')}\n    A: {ss.why_answers.get(l,'')}" for l in range(1,6)])
     std  = "\n".join([f"  - {label}: {ss.std_answers.get(key,'')}" for key,label,_ in ACTION_QUESTIONS])
